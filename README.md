@@ -4,6 +4,8 @@
 
 I want to know how my new robotic vacuum cleaner gets its work so well done.
 
+[A demo is available here](https://mirkosertic.github.io/TurtleBotLidar/).
+
 ## What does it do?
 
 * Very simple Turtlebot simulation with added Lidar sensor
