@@ -276,3 +276,8 @@ p {
   padding: 0.3rem;
   font-size: larger;
 }
+
+p span {
+  font-weight: normal;
+  padding-left: 3rem;
+}

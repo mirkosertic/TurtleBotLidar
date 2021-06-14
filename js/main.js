@@ -85,7 +85,7 @@ var turtleState = {
 }
 
 var noiseFilter = {
-  smoothing : 1,
+  smoothing : 2.5,
   enabled: false,
   currentValue: [],
   process: function(pos, newValue) {
