@@ -81,8 +81,20 @@ var turtleState = {
   theta: 0,
   lidarLength: 100,
   lidarNoise: 0,
-  lidarMinResolution: 1
+  lidarMinResolution: 1,
 }
+
+var turtleMindModel = {
+  estimatedTurtlePosition: {x: 0, y:0, theta: 0},
+  features: [],
+  moveTurtleBy: function(dx, dy) {
+    this.estimatedTurtlePosition.x += dx;
+    this.estimatedTurtlePosition.y += dy;
+  },
+  rotateTurtle: function(angle) {
+    this.estimatedTurtlePosition.theta += angle;
+  },
+};
 
 var noiseFilter = {
   smoothing : 2.5,
@@ -135,6 +147,18 @@ var derivativeOf = function(data,maxsize,offset) {
   return result;
 }
 
+var polarLine = function(xp, yp, angle, length, color) {
+  var xTarget = xp + Math.cos(Math.PI / 180 * angle) * length;
+  var yTarget = yp + Math.sin(Math.PI / 180 * angle) * length;
+  context.strokeStyle = color;
+  context.fillStyle = color;
+  context.beginPath();
+  context.moveTo(xp, yp);
+  context.lineTo(xTarget, yTarget);
+  context.stroke();
+  context.closePath();
+}
+
 var renderData = function(xp, yp, color, data, size, shiftOffset, scaleFactor, caption, height) {
 
   for (var i = 0; i < size; i++) {
@@ -183,6 +207,13 @@ var drawSimulation = function() {
 
   context.clearRect(-100, -100, 1000, 1000);
 
+  // Render reality
+  context.strokeStyle = 'black';
+  context.fillStyle = 'black';
+  context.textAlign = 'left';
+  context.font = "8px Arial";
+  context.fillText('Reality', -20, -20);
+
   // Draw the walls
   context.strokeStyle = 'black';
   context.fillStyle = 'black';
@@ -203,15 +234,23 @@ var drawSimulation = function() {
   context.stroke();
   context.closePath();
 
-  var lockingAtX = turtleState.x + Math.cos(Math.PI / 180 * turtleState.theta) * 20;
-  var lockingAtY = turtleState.y + Math.sin(Math.PI / 180 * turtleState.theta) * 20;
-  context.strokeStyle = 'green';
-  context.fillStyle = 'green';
+  polarLine(turtleState.x, turtleState.y, turtleState.theta, 20, 'green');
+
+  // Render turtles model
+  context.strokeStyle = 'black';
+  context.fillStyle = 'black';
+  context.textAlign = 'left';
+  context.font = "8px Arial";
+  context.fillText('Turtles model', -20, 120);
+
   context.beginPath();
-  context.moveTo(turtleState.x, turtleState.y);
-  context.lineTo(lockingAtX, lockingAtY);
+  context.strokeStyle = 'gray';
+  context.fillStyle = 'gray';
+  context.arc(turtleMindModel.estimatedTurtlePosition.x + 56, turtleMindModel.estimatedTurtlePosition.y + 200, 8, 0, 2 * Math.PI);
   context.stroke();
   context.closePath();
+
+  polarLine(turtleMindModel.estimatedTurtlePosition.x + 56, turtleMindModel.estimatedTurtlePosition.y + 200, turtleMindModel.estimatedTurtlePosition.theta, 20, 'green');
 
   var currentRay = 0;
   var currentFrame = [];
@@ -399,18 +438,33 @@ window.requestAnimationFrame(callback);
 
 window.addEventListener("keydown", function(event) {
   if (event.key == "ArrowUp") {
-    turtleState.x += Math.cos(Math.PI / 180 * turtleState.theta) * 3;
-    turtleState.y += Math.sin(Math.PI / 180 * turtleState.theta) * 3;
+
+    var dx = Math.cos(Math.PI / 180 * turtleState.theta) * 3;
+    var dy = Math.sin(Math.PI / 180 * turtleState.theta) * 3;
+
+    turtleState.x += dx;
+    turtleState.y += dy;
+
+    turtleMindModel.moveTurtleBy(dx, dy)
   }
   if (event.key == "ArrowDown") {
-    turtleState.x += Math.cos(Math.PI / 180 * turtleState.theta) * -3;
-    turtleState.y += Math.sin(Math.PI / 180 * turtleState.theta) * -3;
+    var dx = Math.cos(Math.PI / 180 * turtleState.theta) * -3;
+    var dy =  Math.sin(Math.PI / 180 * turtleState.theta) * -3;
+
+    turtleState.x += dx;
+    turtleState.y += dy;
+
+    turtleMindModel.moveTurtleBy(dx, dy)
   }
   if (event.key == "ArrowLeft") {
     turtleState.theta -= 2;
+
+    turtleMindModel.rotateTurtle(-2);
   }
   if (event.key == "ArrowRight") {
     turtleState.theta += 2;
+
+    turtleMindModel.rotateTurtle(2);
   }
 });
 

@@ -13,16 +13,17 @@ I want to know how my new robotic vacuum cleaner gets its work so well done.
 * Visualization of Lidar data
 * Simple edge detector to detect contour of observed room
 
-## How does it look?
+## Show me a screenshot!
 
 ![Simulation screenshot](doc/screenshot.png)
 
-## How to I build it?
+## How to build it
 
-`npm run dev` should do it all.
+Checkout with `git clone https://github.com/mirkosertic/TurtleBotLidar.git` and `npm run dev` should do it all.
 
 ## What is planned?
 
 * Simulation of Lidar noise
+* Simulation of turtle movement noise
 * A very simple SLAM implementation, maybe with Pose-Graph-Optimization
-* Derive robot position based on learned map, maybe with Particle-Filters.
+* Derive robot position based from learned map, maybe with Particle-Filters.
