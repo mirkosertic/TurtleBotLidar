@@ -19,7 +19,7 @@ I want to know how my new robotic vacuum cleaner gets its work so well done.
 
 ## How to build it
 
-Checkout with `git clone https://github.com/mirkosertic/TurtleBotLidar.git` and `npm run dev` should do it all.
+Checkout with `git clone https://github.com/mirkosertic/TurtleBotLidar.git` and `npm ci && npm run dev` should do it all.
 
 ## What is planned?
 
