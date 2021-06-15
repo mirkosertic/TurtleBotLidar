@@ -25,5 +25,6 @@ Checkout with `git clone https://github.com/mirkosertic/TurtleBotLidar.git` and 
 
 * Simulation of Lidar noise
 * Simulation of turtle movement noise
+* Kalman Filtering
 * A very simple SLAM implementation, maybe with Pose-Graph-Optimization
 * Derive robot position based from learned map, maybe with Particle-Filters.
