@@ -27,6 +27,40 @@ function get_line_intersection(p0_x, p0_y, p1_x, p1_y, p2_x, p2_y, p3_x, p3_y)
   return undefined;
 }
 
+// Taken from https://stackoverflow.com/questions/37224912/circle-line-segment-collision/37225895
+function inteceptCircleLineSeg(cx, cy, cr, p1x, p1y, p2x, p2y) {
+  var a, b, c, d, u1, u2, ret, retP1, retP2, v1, v2;
+  v1 = {};
+  v2 = {};
+  v1.x = p2x - p1x;
+  v1.y = p2y - p1y;
+  v2.x = p1x - cx;
+  v2.y = p1y - cy;
+  b = (v1.x * v2.x + v1.y * v2.y);
+  c = 2 * (v1.x * v1.x + v1.y * v1.y);
+  b *= -2;
+  d = Math.sqrt(b * b - 2 * c * (v2.x * v2.x + v2.y * v2.y - cr * cr));
+  if (isNaN(d)){ // no intercept
+    return [];
+  }
+  u1 = (b - d) / c;  // these represent the unit distance of point one and two on the line
+  u2 = (b + d) / c;
+  retP1 = {};   // return points
+  retP2 = {}
+  ret = []; // return array
+  if(u1 <= 1 && u1 >= 0){  // add point if on the line segment
+    retP1.x = p1x + v1.x * u1;
+    retP1.y = p2y + v1.y * u1;
+    ret[0] = retP1;
+  }
+  if(u2 <= 1 && u2 >= 0){  // second add point if on the line segment
+    retP2.x = p1x + v1.x * u2;
+    retP2.y = p2y + v1.y * u2;
+    ret[ret.length] = retP2;
+  }
+  return ret;
+}
+
 var canvas = document.getElementById("rendering");
 var context = canvas.getContext("2d");
 
@@ -87,6 +121,7 @@ var turtleState = {
 var turtleMindModel = {
   estimatedTurtlePosition: {x: 0, y:0, theta: 0},
   features: [],
+  featureDetectionRadius: 3,
   moveTurtleBy: function(dx, dy) {
     this.estimatedTurtlePosition.x += dx;
     this.estimatedTurtlePosition.y += dy;
@@ -241,7 +276,7 @@ var drawSimulation = function() {
   context.fillStyle = 'black';
   context.textAlign = 'left';
   context.font = "8px Arial";
-  context.fillText('Turtles model', -20, 120);
+  context.fillText('Turtles model no.F. = ' + turtleMindModel.features.length, -20, 120);
 
   context.beginPath();
   context.strokeStyle = 'gray';
@@ -251,6 +286,17 @@ var drawSimulation = function() {
   context.closePath();
 
   polarLine(turtleMindModel.estimatedTurtlePosition.x + 56, turtleMindModel.estimatedTurtlePosition.y + 200, turtleMindModel.estimatedTurtlePosition.theta, 20, 'green');
+
+  for (var i = 0; i < turtleMindModel.features.length; i++) {
+    var feature = turtleMindModel.features[i];
+    context.beginPath();
+    context.strokeStyle = 'black';
+    context.fillStyle = 'black';
+    context.arc(feature.x - 1 + 56, feature.y -1 + 200, 3, 0, 2 * Math.PI);
+    context.stroke();
+    context.closePath();
+
+  }
 
   var currentRay = 0;
   var currentFrame = [];
@@ -390,6 +436,23 @@ var drawSimulation = function() {
       context.arc(featureX, featureY, 2, 0, 2 * Math.PI);
       context.stroke();
       context.closePath();
+
+      var projectionX = turtleMindModel.estimatedTurtlePosition.x + Math.cos(angleInRadians) * turtleState.lidarLength;
+      var projectionY = turtleMindModel.estimatedTurtlePosition.y + Math.sin(angleInRadians) * turtleState.lidarLength
+      var featureFound = false;
+      for (var j = 0; j < turtleMindModel.features.length; j++) {
+        var feature = turtleMindModel.features[j];
+        var detections = inteceptCircleLineSeg(feature.x, feature.y, turtleMindModel.featureDetectionRadius, turtleMindModel.estimatedTurtlePosition.x, turtleMindModel.estimatedTurtlePosition.y, projectionX, projectionY);
+        if (detections.length > 0) {
+          featureFound = true;
+        }
+      }
+      if (!featureFound) {
+        turtleMindModel.features.push({
+          x: turtleMindModel.estimatedTurtlePosition.x + Math.cos(angleInRadians) * distance,
+          y: turtleMindModel.estimatedTurtlePosition.y + Math.sin(angleInRadians) * distance,
+        });
+      }
 
       context.strokeStyle = 'lightgray';
       context.fillStyle = 'lightgray';
