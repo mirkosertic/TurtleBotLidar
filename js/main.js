@@ -119,16 +119,164 @@ var turtleState = {
 }
 
 var turtleMindModel = {
-  estimatedTurtlePosition: {x: 0, y:0, theta: 0},
+  particles: [
+    {
+      x: 0,
+      y:0,
+      theta: 0,
+      score: 1
+    }
+  ],
+  estimatedState: function() {
+      var x = undefined;
+      var y = undefined;
+      var theta = undefined;
+      for (var i = 0; i < this.particles.length; i++) {
+        var particle = this.particles[i];
+        if (x) {
+          x = (x + particle.x) / 2;
+        } else {
+          x = particle.x;
+        }
+        if (y) {
+          y = (y + particle.y) / 2;
+        } else {
+          y = particle.y;
+        }
+        if (theta) {
+          theta = (theta + particle.theta) / 2;
+        } else {
+          theta = particle.theta;
+        }
+      }
+      return {
+        x: x,
+        y: y,
+        theta: theta
+      }
+  },
+  randomness: 1,
   features: [],
   featureDetectionRadius: 3,
   moveTurtleBy: function(dx, dy) {
-    this.estimatedTurtlePosition.x += dx;
-    this.estimatedTurtlePosition.y += dy;
+    var newParticles = [];
+    for (var i = 0; i < this.particles.length; i++) {
+      var particle = this.particles[i];
+      particle.x += dx;
+      particle.y += dy;
+      if (particle.score > 0) {
+        for (var j = 0; j < this.randomness; j++) {
+          var newParticle = {
+            x: particle.x + dx + gaussianNoise(30),
+            y: particle.y + dy + gaussianNoise(30),
+            theta: particle.theta + gaussianNoise(10),
+          };
+          newParticles.push(newParticle);
+        }
+      }
+    }
+    this.particles = this.particles.concat(newParticles);
   },
   rotateTurtle: function(angle) {
-    this.estimatedTurtlePosition.theta += angle;
+    var newParticles = [];
+    for (var i = 0; i < this.particles.length; i++) {
+      var particle = this.particles[i];
+      particle.theta += angle;
+      if (particle.score > 0) {
+        for (var j = 0; j < this.randomness; j++) {
+          var newParticle = {
+            x: particle.x + gaussianNoise(5),
+            y: particle.y + gaussianNoise(5),
+            theta: particle.theta + angle + gaussianNoise(10),
+          };
+          newParticles.push(newParticle);
+        }
+      }
+    }
+    this.particles = this.particles.concat(newParticles);
   },
+  updateParticleState: function(detectedFeatures) {
+    var estimatedState = turtleMindModel.estimatedState();
+
+    // If we do not have features, we initially add the found one to our map
+    if (this.features.length === 0) {
+      for (var i = 0; i < detectedFeatures.length; i++) {
+        var feature = detectedFeatures[i];
+
+        var angleInRadians = Math.PI / 180 * (feature.angle + estimatedState.theta);
+        var featureX = estimatedState.x + Math.cos(angleInRadians) * feature.distance;
+        var featureY = estimatedState.y + Math.sin(angleInRadians) * feature.distance;
+
+        this.features.push({
+            x: featureX,
+            y: featureY
+        });
+      }
+    } else {
+      // Now comes the tricky part: we evaluate the found features against
+      // every particle and verify the expectations
+      for (var i = 0; i < this.particles.length; i++) {
+        var particle = this.particles[i];
+        particle.score = 0;
+        for (var j = 0; j < this.features.length; j++) {
+          var expectedFeature = this.features[j];
+          var dx = expectedFeature.x - particle.x;
+          var dy = expectedFeature.y - particle.y;
+          // Now we check, if there is such a feature
+          for (var k = 0; k < detectedFeatures.length; k++) {
+            var detectedFeature = detectedFeatures[k];
+
+            var angleInRadians = Math.PI / 180 * (detectedFeature.angle + particle.theta);
+            var detectedFeatureX = Math.cos(angleInRadians) * detectedFeature.distance;
+            var detectedFeatureY = Math.sin(angleInRadians) * detectedFeature.distance;
+
+            context.beginPath();
+            context.strokeStyle = 'gray';
+            context.fillStyle = 'gray';
+            context.arc(56 + particle.x + detectedFeatureX, particle.y + 200 + detectedFeatureY, 8, 0, 2 * Math.PI);
+            context.stroke();
+            context.closePath();
+
+            context.beginPath();
+            context.strokeStyle = 'blue';
+            context.fillStyle = 'blue';
+            context.arc(56 + estimatedState.x + dx, 200 + estimatedState.y + dy, 6, 0, 2 * Math.PI);
+            context.stroke();
+            context.closePath();
+
+            var dfX = Math.abs(detectedFeatureX - dx);
+            var dfY = Math.abs(detectedFeatureY - dy);
+
+            console.log("dfX = " + dfX + ", dfY = " + dfY);
+
+            if (dfX < 1 && dfY < 1) {
+              // Maybe a match, the particle gets a hit point
+              particle.score += 1;
+            }
+          }
+        }
+      }
+      // We calculate the mean score
+      var meanScore = undefined;
+      for (var i = 0; i < this.particles.length; i++) {
+        if (meanScore) {
+          meanScore = (meanScore + this.particles[i].score) / 2;
+        } else {
+          meanScore = this.particles[i].score;
+        }
+      }
+
+      // We are done here, now we evaluate dead particles
+      this.particles = this.particles.filter(function(value, index, arr) {
+        if (value.score >= meanScore) {
+          return true;
+        } else {
+          console.log("Particle " + index + " got score " + value.score + " from " + detectedFeatures.length + " and will be removed!");
+          return false;
+        }
+      });
+    }
+  }
 };
 
 var noiseFilter = {
@@ -253,7 +401,7 @@ var drawSimulation = function() {
   context.strokeStyle = 'black';
   context.fillStyle = 'black';
   context.beginPath();
-  for (i = 0; i < walls.length; i++) {
+  for (var i = 0; i < walls.length; i++) {
     var wall = walls[i];
     context.moveTo(wall.x1, wall.y1);
     context.lineTo(wall.x2, wall.y2);
@@ -276,22 +424,24 @@ var drawSimulation = function() {
   context.fillStyle = 'black';
   context.textAlign = 'left';
   context.font = "8px Arial";
-  context.fillText('Turtles model no.F. = ' + turtleMindModel.features.length, -20, 120);
+  context.fillText('Turtles model no.F. = ' + turtleMindModel.features.length + ", no. P = " + turtleMindModel.particles.length, -20, 120);
 
-  context.beginPath();
-  context.strokeStyle = 'gray';
-  context.fillStyle = 'gray';
-  context.arc(turtleMindModel.estimatedTurtlePosition.x + 56, turtleMindModel.estimatedTurtlePosition.y + 200, 8, 0, 2 * Math.PI);
-  context.stroke();
-  context.closePath();
-
-  polarLine(turtleMindModel.estimatedTurtlePosition.x + 56, turtleMindModel.estimatedTurtlePosition.y + 200, turtleMindModel.estimatedTurtlePosition.theta, 20, 'green');
+  for (var i = 0; i < turtleMindModel.particles.length; i++) {
+    var particle = turtleMindModel.particles[i];
+    context.beginPath();
+    context.strokeStyle = 'gray';
+    context.fillStyle = 'gray';
+    context.arc(particle.x + 56, particle.y + 200, 8, 0, 2 * Math.PI);
+    context.stroke();
+    context.closePath();
+    polarLine(particle.x + 56, particle.y + 200, particle.theta, 20, 'green');
+  }
 
   for (var i = 0; i < turtleMindModel.features.length; i++) {
     var feature = turtleMindModel.features[i];
     context.beginPath();
-    context.strokeStyle = 'black';
-    context.fillStyle = 'black';
+    context.strokeStyle = 'red';
+    context.fillStyle = 'red';
     context.arc(feature.x - 1 + 56, feature.y -1 + 200, 3, 0, 2 * Math.PI);
     context.stroke();
     context.closePath();
@@ -404,6 +554,8 @@ var drawSimulation = function() {
   renderData(200, 90, 'DarkSlateGrey', rateOfChanges1st, maxNumScans, rotationOffset, 3, '1st derivative', 20);
   renderData(200, 160, 'DarkSlateGrey', rateOfChanges2nd, maxNumScans, rotationOffset, 15, '2nd derivative',20);
 
+  var detectedFeatures = [];
+
   // Check for maxima and sharp edges
   for (var i = 0; i < currentRay; i++) {
     var current1stValue = positionOverflowingValueFrom(i, rateOfChanges1st, maxNumScans);
@@ -429,6 +581,11 @@ var drawSimulation = function() {
       var featureX = turtleState.x + Math.cos(angleInRadians) * distance;
       var featureY = turtleState.y + Math.sin(angleInRadians) * distance;
 
+      detectedFeatures.push({
+        angle: angle - turtleState.theta,
+        distance: distance
+      });
+
       // Mark Feature on the Map
       context.beginPath();
       context.strokeStyle = 'red';
@@ -436,23 +593,6 @@ var drawSimulation = function() {
       context.arc(featureX, featureY, 2, 0, 2 * Math.PI);
       context.stroke();
       context.closePath();
-
-      var projectionX = turtleMindModel.estimatedTurtlePosition.x + Math.cos(angleInRadians) * turtleState.lidarLength;
-      var projectionY = turtleMindModel.estimatedTurtlePosition.y + Math.sin(angleInRadians) * turtleState.lidarLength
-      var featureFound = false;
-      for (var j = 0; j < turtleMindModel.features.length; j++) {
-        var feature = turtleMindModel.features[j];
-        var detections = inteceptCircleLineSeg(feature.x, feature.y, turtleMindModel.featureDetectionRadius, turtleMindModel.estimatedTurtlePosition.x, turtleMindModel.estimatedTurtlePosition.y, projectionX, projectionY);
-        if (detections.length > 0) {
-          featureFound = true;
-        }
-      }
-      if (!featureFound) {
-        turtleMindModel.features.push({
-          x: turtleMindModel.estimatedTurtlePosition.x + Math.cos(angleInRadians) * distance,
-          y: turtleMindModel.estimatedTurtlePosition.y + Math.sin(angleInRadians) * distance,
-        });
-      }
 
       context.strokeStyle = 'lightgray';
       context.fillStyle = 'lightgray';
@@ -490,6 +630,8 @@ var drawSimulation = function() {
       context.closePath();
     }
   }
+
+  turtleMindModel.updateParticleState(detectedFeatures);
 }
 
 var callback = function() {
