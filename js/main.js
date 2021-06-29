@@ -64,7 +64,7 @@ const turtleMindModel = {
     const newParticles = [];
     for (let i = 0; i < this.particles.length; i++) {
       const particle = this.particles[i];
-      particle.location.translate(dx, dy);
+      particle.location.translate(dx + gaussianNoise(3), dy + gaussianNoise(3));
       particle.uncertainty = Math.pow(10, 2)
     }
     this.particles = this.particles.concat(newParticles);
