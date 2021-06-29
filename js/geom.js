@@ -21,6 +21,7 @@ class Point {
   translate(mx, my) {
     this.x += mx;
     this.y += my;
+    return this;
   }
 }
 

@@ -19,13 +19,15 @@ const turtleMindModel = {
     {
       location: new Point(0, 0),
       theta: 0,
-      score: 1
+      score: 1,
+      uncertainty: Math.pow(10, 2)
     }
   ],
   estimatedState: function () {
     var x = undefined;
     var y = undefined;
     var theta = undefined;
+    var uncertainty = undefined;
     for (let i = 0; i < this.particles.length; i++) {
       const particle = this.particles[i];
       if (x) {
@@ -43,10 +45,16 @@ const turtleMindModel = {
       } else {
         theta = particle.theta;
       }
+      if (uncertainty) {
+        uncertainty = (uncertainty + particle.uncertainty) / 2;
+      } else {
+        uncertainty = particle.uncertainty;
+      }
     }
     return {
       location: new Point(x, y),
-      theta: theta
+      theta: theta,
+      uncertainty: uncertainty
     }
   },
   features: [],
@@ -57,6 +65,7 @@ const turtleMindModel = {
     for (let i = 0; i < this.particles.length; i++) {
       const particle = this.particles[i];
       particle.location.translate(dx, dy);
+      particle.uncertainty = Math.pow(10, 2)
     }
     this.particles = this.particles.concat(newParticles);
   },
@@ -66,6 +75,7 @@ const turtleMindModel = {
     for (let i = 0; i < this.particles.length; i++) {
       const particle = this.particles[i];
       particle.theta += angle;
+      particle.uncertainty = Math.pow(10, 2)
     }
     this.particles = this.particles.concat(newParticles);
   },
@@ -113,11 +123,30 @@ const turtleMindModel = {
             const dfX = Math.abs(featureProjection.x - dx);
             const dfY = Math.abs(featureProjection.y - dy);
 
+            // TODO: Can be better computed by a square root
             if (dfX < 10 && dfY < 10) {
               detectedFeature.identified = true;
               // Maybe a match, the particle gets a hit point
-              // TODO: We know the particle, we can adjust the particle position, maybe with a Kalman filter?
               particle.score += 1;
+
+              //
+              // Kalman filter
+              //
+
+              // Previous state, distance to feature
+              const distanceToFeature = expectedFeature.distanceTo(particle.location);
+
+              // We calculate the Kalman gain
+              const kg = estimatedState.uncertainty / (estimatedState.uncertainty + detectedFeature.uncertainty);
+
+              // Uncertainty update
+              particle.uncertainty = (1 - kg) * estimatedState.uncertainty;
+
+              // Estimate the new distance based on previous state and current measurement
+              const updatedNewDistance = distanceToFeature + kg * (detectedFeature.distance - distanceToFeature);
+
+              // Backprojection of new distance from feature to get the new estimated position
+              particle.location = expectedFeature.polarProjection(detectedFeature.angle + particle.theta + 180, updatedNewDistance);
             }
           }
         }
@@ -265,10 +294,17 @@ function drawSimulation() {
     context.beginPath();
     context.strokeStyle = 'gray';
     context.fillStyle = 'gray';
-    context.arc(particle.x + 56, particle.y + 200, 8, 0, 2 * Math.PI);
+    context.arc(particle.location.x + 56, particle.location.y + 200, 8, 0, 2 * Math.PI);
     context.stroke();
     context.closePath();
-    polarLine(new Point(particle.x + 56, particle.y + 200), particle.theta, 20, 'green');
+    polarLine(new Point(particle.location.x + 56, particle.location.y + 200), particle.theta, 20, 'green');
+
+    context.strokeStyle = 'black';
+    context.fillStyle = 'black';
+    context.textAlign = 'left';
+    context.font = "8px Arial";
+    context.fillText('Uncertainty:', particle.location.x + 46, particle.location.y + 170);
+    context.fillText(particle.uncertainty.toPrecision(4), particle.location.x + 46, particle.location.y + 180);
   }
 
   for (let i = 0; i < turtleMindModel.features.length; i++) {
@@ -408,7 +444,8 @@ function drawSimulation() {
 
       detectedFeatures.push({
         angle: angle - turtleState.theta,
-        distance: distance
+        distance: distance,
+        uncertainty: Math.pow(5, 2)
       });
 
       // Mark Feature on the Map
