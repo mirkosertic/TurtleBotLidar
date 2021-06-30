@@ -86,9 +86,10 @@ const turtleMindModel = {
     if (this.features.length === 0) {
       for (let i = 0; i < detectedFeatures.length; i++) {
         const feature = detectedFeatures[i];
-        this.features.push(
-          estimatedState.location.polarProjection(feature.angle + estimatedState.theta, feature.distance)
-        );
+        this.features.push({
+            uncertainty: Math.pow(10, 2),
+            location: estimatedState.location.polarProjection(feature.angle + estimatedState.theta, feature.distance)
+        });
       }
     } else {
       // Now comes the tricky part: we evaluate the found features against
@@ -98,34 +99,36 @@ const turtleMindModel = {
         particle.score = 0;
         for (let j = 0; j < this.features.length; j++) {
           const expectedFeature = this.features[j];
-          const dx = expectedFeature.x - particle.location.x;
-          const dy = expectedFeature.y - particle.location.y;
+
           // Now we check, if there is such a feature
           for (let k = 0; k < detectedFeatures.length; k++) {
             const detectedFeature = detectedFeatures[k];
 
             const featureProjection = new Point(0, 0).polarProjection(detectedFeature.angle + particle.theta, detectedFeature.distance);
 
+            // This is what we have measured
+            const measuredFeaturePosition = featureProjection.translate(particle.location.x, particle.location.y);
+
             context.beginPath();
             context.strokeStyle = 'gray';
             context.fillStyle = 'gray';
-            context.arc(56 + particle.location.x + featureProjection.x, particle.location.y + 200 + featureProjection.y, 8, 0, 2 * Math.PI);
+            context.arc(56 + measuredFeaturePosition.x, 200 + measuredFeaturePosition.y, 8, 0, 2 * Math.PI);
             context.stroke();
             context.closePath();
 
-            context.beginPath();
-            context.strokeStyle = 'blue';
-            context.fillStyle = 'blue';
-            context.arc(56 + estimatedState.location.x + dx, 200 + estimatedState.location.y + dy, 6, 0, 2 * Math.PI);
-            context.stroke();
-            context.closePath();
+            const distance = measuredFeaturePosition.distanceTo(expectedFeature.location);
 
-            const dfX = Math.abs(featureProjection.x - dx);
-            const dfY = Math.abs(featureProjection.y - dy);
-
-            // TODO: Can be better computed by a square root
-            if (dfX < 10 && dfY < 10) {
+            if (distance < 10) {
               detectedFeature.identified = true;
+
+              // This is what we have found
+              context.beginPath();
+              context.strokeStyle = 'blue';
+              context.fillStyle = 'blue';
+              context.arc(56 + measuredFeaturePosition.x, 200 + measuredFeaturePosition.y, 6, 0, 2 * Math.PI);
+              context.stroke();
+              context.closePath();
+
               // Maybe a match, the particle gets a hit point
               particle.score += 1;
 
@@ -134,7 +137,7 @@ const turtleMindModel = {
               //
 
               // Previous state, distance to feature
-              const distanceToFeature = expectedFeature.distanceTo(particle.location);
+              const distanceToFeature = expectedFeature.location.distanceTo(particle.location);
 
               // We calculate the Kalman gain
               const kg = estimatedState.uncertainty / (estimatedState.uncertainty + detectedFeature.uncertainty);
@@ -145,8 +148,11 @@ const turtleMindModel = {
               // Estimate the new distance based on previous state and current measurement
               const updatedNewDistance = distanceToFeature + kg * (detectedFeature.distance - distanceToFeature);
 
+              const oldLocation = particle.location;
+
               // Backprojection of new distance from feature to get the new estimated position
-              particle.location = expectedFeature.polarProjection(detectedFeature.angle + particle.theta + 180, updatedNewDistance);
+              particle.location = expectedFeature.location.polarProjection(detectedFeature.angle + particle.theta + 180, updatedNewDistance);
+              expectedFeature.location = oldLocation.polarProjection(detectedFeature.angle + particle.theta, updatedNewDistance);
             }
           }
         }
@@ -175,19 +181,24 @@ const turtleMindModel = {
 };
 
 const noiseFilter = {
-  smoothing : 2.5,
+  smoothing : 2,
   enabled: false,
-  currentValue: [],
+  window: [],
+  sum: undefined,
 
   process: function(pos, newValue) {
     if (this.enabled) {
-      if (this.currentValue[pos]) {
-        this.currentValue[pos] += (newValue - this.currentValue[pos]) / this.smoothing;
-        return this.currentValue[pos];
+      if (this.sum) {
+        this.sum += newValue;
       } else {
-        this.currentValue[pos] = newValue;
-        return newValue;
+        this.sum = newValue;
       }
+      this.window.push(newValue);
+      if (this.window.length <= this.smoothing) {
+        return this.sum / this.window.length;
+      }
+      this.sum -= this.window.shift();
+      return this.sum / this.smoothing;
     } else {
       return newValue;
     }
@@ -312,7 +323,7 @@ function drawSimulation() {
     context.beginPath();
     context.strokeStyle = 'red';
     context.fillStyle = 'red';
-    context.arc(feature.x - 1 + 56, feature.y -1 + 200, 3, 0, 2 * Math.PI);
+    context.arc(feature.location.x - 1 + 56, feature.location.y -1 + 200, 3, 0, 2 * Math.PI);
     context.stroke();
     context.closePath();
   }
