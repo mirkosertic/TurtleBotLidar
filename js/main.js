@@ -180,31 +180,6 @@ const turtleMindModel = {
   }
 };
 
-const noiseFilter = {
-  smoothing : 2,
-  enabled: false,
-  window: [],
-  sum: undefined,
-
-  process: function(pos, newValue) {
-    if (this.enabled) {
-      if (this.sum) {
-        this.sum += newValue;
-      } else {
-        this.sum = newValue;
-      }
-      this.window.push(newValue);
-      if (this.window.length <= this.smoothing) {
-        return this.sum / this.window.length;
-      }
-      this.sum -= this.window.shift();
-      return this.sum / this.smoothing;
-    } else {
-      return newValue;
-    }
-  }
-}
-
 function polarLine(location, angle, length, color) {
   const rayTarget = location.polarProjection(angle, length);
   context.strokeStyle = color;
@@ -328,46 +303,22 @@ function drawSimulation() {
     context.closePath();
   }
 
-  var currentRay = 0;
-  const currentFrame = [];
-  const angles = [];
+  const lidarFrame = turtleState.lidarFrame();
+
+  const currentRay = lidarFrame.angles.length;
+  const currentFrame = lidarFrame.distances;
+  const angles = lidarFrame.angles;
 
   const maxNumScans = 360 / turtleState.lidarMinResolution;
   const rotationOffset = maxNumScans / 2;
 
-  for (let i = turtleState.theta; i < turtleState.theta + 360; i += turtleState.lidarMinResolution, currentRay++) {
+  for (let i = 0; i < currentRay; i += 1) {
 
-    const lidarRayTarget = turtleState.location.polarProjection(i, turtleState.lidarLength);
+    const lidarRayTarget = turtleState.location.polarProjection(i + turtleState.theta, turtleState.lidarLength);
 
-    var nearestIntersection = undefined;
-    for (let j = 0; j < turtleState.walls.length; j++) {
-      const wall = turtleState.walls[j];
-      const intersection = wall.intersectionWith(new Linesegment(turtleState.location, lidarRayTarget));
-      if (intersection) {
-        const distance = noiseFilter.process(currentRay, turtleState.location.distanceTo(intersection) + gaussianNoise(turtleState.lidarNoise));
-        if (nearestIntersection) {
-          if (nearestIntersection.distance > distance) {
-            nearestIntersection = {
-              distance: distance,
-              intersection: intersection
-            };
-          }
-        } else {
-          nearestIntersection = {
-            distance: distance,
-            intersection: intersection
-          }
-        }
-      }
-    }
-
-    if (nearestIntersection) {
-
-      currentFrame[currentRay] = nearestIntersection.distance;
-      angles[currentRay] = i;
-
-      // Do some back projection
-      const wallHitPoint = turtleState.location.polarProjection(i, nearestIntersection.distance);
+    const distance = currentFrame[i];
+    if (distance) {
+      const wallHitPoint = turtleState.location.polarProjection(i + turtleState.theta, distance);
 
       context.beginPath();
       context.strokeStyle = 'CadetBlue';
@@ -385,9 +336,9 @@ function drawSimulation() {
         context.fillStyle = 'CadetBlue';
       }
 
-      const scanProfileX = 200 + ((currentRay + rotationOffset) % maxNumScans);
+      const scanProfileX = 200 + ((i + rotationOffset) % maxNumScans);
       const scanProfileYStart = 50;
-      const scanProfileYEnd = scanProfileYStart - nearestIntersection.distance;
+      const scanProfileYEnd = scanProfileYStart - distance;
 
       context.moveTo(scanProfileX, scanProfileYStart);
       context.lineTo(scanProfileX, scanProfileYEnd);
@@ -396,6 +347,7 @@ function drawSimulation() {
       context.closePath();
 
     } else {
+
       context.strokeStyle = 'rgba(128,128,128,0.05)';
       context.fillStyle = 'rgba(128,128,128,0.05)';
       context.beginPath();
@@ -442,7 +394,7 @@ function drawSimulation() {
       if (previous1stValue >= 0 && current1stValue < 0) {
         // Farest point, maxima in lidar data
         featureDetected = true;
-      } else if (previous1stValue < 0 && current1stValue > 0.025) {
+      } else if (previous1stValue < 0 && current1stValue > 0.45) {
         // Sharp edge
         featureDetected = true;
       }
@@ -540,4 +492,3 @@ window.addEventListener("keydown", function(event) {
     turtleMindModel.rotateTurtle(2);
   }
 });
-
