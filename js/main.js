@@ -395,7 +395,7 @@ function drawSimulation() {
 
     var featureDetected = false;
     if (current1stValue && next1stValue && current2ndValue) {
-      if ((current1stValue < 0 && next1stValue >= 0) || (current1stValue >=0 && next1stValue < 0)) {
+      if ((current1stValue < 0 && next1stValue >= 0) || (current1stValue >= 0 && next1stValue < 0)) {
         // Sign change
         if (Math.abs(current2ndValue) > 0.1) {
           featureDetected = true;
