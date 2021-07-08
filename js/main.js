@@ -389,18 +389,17 @@ function drawSimulation() {
   // Check for maxima and sharp edges
   for (let i = 0; i < currentRay; i++) {
     const current1stValue = positionOverflowingValueFrom(i, rateOfChanges1st, maxNumScans);
-    const previous1stValue = positionOverflowingValueFrom(i - 1, rateOfChanges1st, maxNumScans);
+    const next1stValue = positionOverflowingValueFrom(i + 1, rateOfChanges1st, maxNumScans);
 
     const current2ndValue = positionOverflowingValueFrom(i, rateOfChanges2nd, maxNumScans);
 
     var featureDetected = false;
-    if (current1stValue && previous1stValue && current2ndValue) {
-      if (previous1stValue >= 0 && current1stValue < 0 && current2ndValue < -0.3) {
-        // Farest point, maxima in lidar data
-        featureDetected = true;
-      } else if (previous1stValue < 0 && current1stValue >= 0 && current2ndValue > 0.3) {
-        // Sharp edge
-        featureDetected = true;
+    if (current1stValue && next1stValue && current2ndValue) {
+      if ((current1stValue < 0 && next1stValue >= 0) || (current1stValue >=0 && next1stValue < 0)) {
+        // Sign change
+        if (Math.abs(current2ndValue) > 0.1) {
+          featureDetected = true;
+        }
       }
     }
 
