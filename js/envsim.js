@@ -5,11 +5,12 @@ class TurtleState {
 
   constructor() {
     this.location = new Point(56, 56);
-    this.theta = 0;
+    this.theta = 45;
     this.lidarLength = 100;
     this.lidarNoise = 0;
+    this.lidarSamples = 0;
     this.lidarMinResolution = 1;
-    this.lidarSampleCount = 0;
+    this.edgeDetectionThreshold = 5;
     this.walls = [
       new Linesegment(new Point(0,0), new Point(150, 0)),
       new Linesegment(new Point(150, 0), new Point(150, 100)),
@@ -36,10 +37,9 @@ class TurtleState {
         const intersection = wall.intersectionWith(new Linesegment(this.location, lidarRayTarget));
         if (intersection) {
           let distance = this.location.distanceTo(intersection) + gaussianNoise(this.lidarNoise);
-          // Now, we take more samples to average out noise
-          for (let k = 0; k < this.lidarSampleCount; k++) {
-            let newMeasure = this.location.distanceTo(intersection) + gaussianNoise(this.lidarNoise);
-            distance = (distance + newMeasure) / 2;
+          for (let k = 0; k < this.lidarSamples; k++) {
+            let d2 = this.location.distanceTo(intersection) + gaussianNoise(this.lidarNoise);
+            distance = (distance + d2) / 2;
           }
           if (nearestIntersection) {
             if (nearestIntersection.distance > distance) {

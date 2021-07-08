@@ -18,7 +18,7 @@ const turtleMindModel = {
   particles: [
     {
       location: new Point(0, 0),
-      theta: 0,
+      theta: turtleState.theta,
       score: 1,
       uncertainty: Math.pow(10, 2)
     }
@@ -235,6 +235,8 @@ function renderData(xp, yp, color, data, size, shiftOffset, scaleFactor, caption
   context.restore();
 }
 
+var dataBlob = undefined;
+
 function drawSimulation() {
 
   context.clearRect(-100, -100, 1000, 1000);
@@ -373,14 +375,16 @@ function drawSimulation() {
   context.closePath();
   context.restore();
 
-  const rateOfChanges1st = derivativeOf(currentFrame, currentRay, 1);
-  const rateOfChanges2nd = derivativeOf(rateOfChanges1st, currentRay, 1);
+  const rateOfChanges1st = derivativeOf(currentFrame, currentRay, turtleState.edgeDetectionThreshold);
+  const rateOfChanges2nd = derivativeOf(rateOfChanges1st, currentRay, turtleState.edgeDetectionThreshold);
 
   // Render derivatives
-  renderData(200, 90, 'DarkSlateGrey', rateOfChanges1st, maxNumScans, rotationOffset, 3, '1st derivative', 20);
-  renderData(200, 160, 'DarkSlateGrey', rateOfChanges2nd, maxNumScans, rotationOffset, 15, '2nd derivative',20);
+  renderData(200, 90, 'DarkSlateGrey', rateOfChanges1st, maxNumScans, rotationOffset, 5, '1st derivative', 20);
+  renderData(200, 160, 'DarkSlateGrey', rateOfChanges2nd, maxNumScans, rotationOffset, 20, '2nd derivative',20);
 
   const detectedFeatures = [];
+
+  var csv = 'Angle;Distance;1st dvt;2nd dvt;Feature Detected\n';
 
   // Check for maxima and sharp edges
   for (let i = 0; i < currentRay; i++) {
@@ -391,14 +395,33 @@ function drawSimulation() {
 
     var featureDetected = false;
     if (current1stValue && previous1stValue && current2ndValue) {
-      if (previous1stValue >= 0 && current1stValue < 0) {
+      if (previous1stValue >= 0 && current1stValue < 0 && current2ndValue < -0.3) {
         // Farest point, maxima in lidar data
         featureDetected = true;
-      } else if (previous1stValue < 0 && current1stValue > 0.45) {
+      } else if (previous1stValue < 0 && current1stValue >= 0 && current2ndValue > 0.3) {
         // Sharp edge
         featureDetected = true;
       }
     }
+
+    csv+= '' + i + ';';
+    if (currentFrame[i]) {
+      csv+=Math.round(currentFrame[i] * 100);
+    }
+    csv+=';';
+    if (rateOfChanges1st[i]) {
+      csv+=Math.round(rateOfChanges1st[i] * 100);
+    }
+    csv+=';';
+    if (rateOfChanges2nd[i]) {
+      csv+=Math.round(rateOfChanges2nd[i] * 100);
+    }
+    csv+=';';
+    if (featureDetected)  {
+      csv+='Feature';
+    }
+    csv+='\n';
+
     const distance = currentFrame[i];
     if (featureDetected && distance) {
 
@@ -452,6 +475,11 @@ function drawSimulation() {
       context.closePath();
     }
   }
+
+  dataBlob = new Blob([csv], {type: 'text/csv'});
+  const element = document.getElementById('download');
+  element.href = window.URL.createObjectURL(dataBlob);
+  element.dowload = 'snapshot.csv';
 
   turtleMindModel.updateParticleState(detectedFeatures);
 }

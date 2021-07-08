@@ -281,3 +281,9 @@ p span {
   font-weight: normal;
   padding-left: 3rem;
 }
+
+p a {
+  font-weight: normal;
+  padding-left: 3rem;
+  text-decoration: none;
+}
